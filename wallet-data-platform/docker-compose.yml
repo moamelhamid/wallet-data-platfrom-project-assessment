@@ -1,0 +1,52 @@
+
+# Digital Wallet Data Platform
+# - postgres    : operational database (OLTP)  -> localhost:5432
+# - clickhouse  : analytical warehouse (DWH)   -> localhost:8123 (HTTP) / 9000 (native)
+#
+# Start:  docker compose up -d
+# Stop :  docker compose down          (keep data)
+# Reset:  docker compose down -v       (wipe data)
+
+services:
+  postgres:
+    image: postgres:16.4
+    container_name: wallet_postgres
+    environment:
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet_pass
+      POSTGRES_DB: wallet_oltp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet_oltp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: wallet_clickhouse
+    environment:
+      CLICKHOUSE_USER: wallet
+      CLICKHOUSE_PASSWORD: wallet_pass
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"   # HTTP interface (used by clickhouse-connect)
+      - "9000:9000"   # native TCP interface
+    volumes:
+      - ch_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg_data:
+  ch_data:
